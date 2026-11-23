@@ -184,6 +184,14 @@ details[open] .chev{transform:rotate(90deg)}
 .card-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .card-btns .btn{justify-content:center}
 
+.gmeter{margin-top:16px;padding:12px 16px}
+.gm-top{display:flex;justify-content:space-between;font-size:13px;font-weight:800;color:var(--muted)}
+.gm-top b{color:var(--ink)}
+.gm-bar{height:10px;border-radius:999px;background:#dfe1f5;margin:8px 0 6px;overflow:hidden;box-shadow:inset 2px 2px 4px rgba(104,96,190,.25)}
+.gm-bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#6ff0cc,#17b98c);transition:width .3s}
+.gmeter.bad .gm-bar i{background:linear-gradient(90deg,#ff9a9a,#ea4335)}
+.gm-msg{font-size:12.5px;font-weight:700;color:var(--muted)}
+.gmeter.bad .gm-msg{color:#c5221f}
 footer{text-align:center;margin-top:34px;color:var(--muted);font-weight:700;font-size:14px}
 footer b{color:var(--pri-d)}
 footer .heart{color:var(--pink)}
@@ -270,7 +278,10 @@ footer .heart{color:var(--pink)}
             <select data-k="st.imgPos"><option value="layout">Inside layout</option><option value="banner">Banner below</option></select>
           </div>
         </div>
-        <div class="field"><label>Image width (full image)</label><div class="range"><input type="range" min="60" max="520" step="10" data-k="st.imgWidth"><output data-show="st.imgWidth"></output></div></div>
+        <div class="field"><label>Image size</label>
+          <select data-k="st.imgFit"><option value="match">Match signature height (auto)</option><option value="width">Custom width</option></select>
+        </div>
+        <div class="field"><label>Custom / banner width</label><div class="range"><input type="range" min="60" max="520" step="10" data-k="st.imgWidth"><output data-show="st.imgWidth"></output></div></div>
         <p class="hint" id="imgHint">GIFs keep their animation and images keep their exact shape. <b>Gmail</b> only shows images from a <b>hosted link</b> (public URL ending in .gif/.png/.jpg) — uploaded files are for preview &amp; Outlook. Leave empty to show initials.</p>
       </div>
 
@@ -392,6 +403,11 @@ footer .heart{color:var(--pink)}
           <button class="btn" data-copy="html">Copy HTML</button>
           <button class="btn mint" data-copy="text">Copy plain text</button>
         </div>
+        <div class="gmeter inset" id="gmeter">
+          <div class="gm-top"><b>Gmail size limit</b><span id="gmText"></span></div>
+          <div class="gm-bar"><i id="gmBar"></i></div>
+          <div class="gm-msg" id="gmMsg"></div>
+        </div>
       </div>
 
       <details class="code-card clay" id="codeCard">
@@ -427,7 +443,7 @@ footer .heart{color:var(--pink)}
     <div class="subtabs seg inset" id="mTabs"></div>
     <ol class="steps" id="mSteps"></ol>
     <p class="note" id="mNote"></p>
-    <div class="modal-foot"><button class="btn" id="mClose">Got it</button></div>
+    <div class="modal-foot"><button class="btn gmail" id="mAlt" style="display:none">Copy without image</button><button class="btn" id="mClose">Got it</button></div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -452,15 +468,25 @@ const T = st => `font-family:${st.font};font-size:${st.size}px;color:${st.text};
 const TBL = (style='') => `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;${style}">`;
 const radius = st => st.photoShape==='circle' ? '50%' : st.photoShape==='rounded' ? '14px' : '0';
 
-function fullImg(d, st, w){
+const M = st => st._m ? ' id="ess-m"' : '';
+function fullImg(d, st, w, h){
   const r = st.photoShape==='square' ? '0' : '8px';
-  return `<img src="${esc(d.photo)}" width="${w}" alt="${esc(d.name||'image')}" style="display:block;width:${w}px;max-width:100%;height:auto;border:0;border-radius:${r};">`;
+  const alt = esc(d.name||'image');
+  if(h){
+    const ww = d.photoAR ? Math.round(h*d.photoAR) : 0;
+    return `<img src="${esc(d.photo)}" height="${h}"${ww?` width="${ww}"`:''} alt="${alt}" style="display:block;height:${h}px;width:${ww?ww+'px':'auto'};border:0;border-radius:${r};">`;
+  }
+  const hh = d.photoAR ? Math.round(w/d.photoAR) : 0;
+  return `<img src="${esc(d.photo)}" width="${w}"${hh?` height="${hh}"`:''} alt="${alt}" style="display:block;width:${w}px;max-width:100%;height:auto;border:0;border-radius:${r};">`;
 }
 function avatar(d, st, opt={}){
   if(!st.showPhoto) return '';
   if(d.photo && st.imgPos==='banner') return '';
   const sz = opt.size || st.photoSize;
-  if(d.photo && st.imgMode!=='crop') return fullImg(d, st, st.imgWidth);
+  if(d.photo && st.imgMode!=='crop'){
+    if(opt.match && st.imgFit==='match' && st._textH) return fullImg(d, st, 0, st._textH);
+    return fullImg(d, st, st.imgWidth);
+  }
   if(d.photo){
     return `<img src="${esc(d.photo)}" width="${sz}" height="${sz}" alt="${esc(d.name)}" style="display:block;width:${sz}px;height:${sz}px;border-radius:${radius(st)};object-fit:cover;border:0;">`;
   }
@@ -530,10 +556,10 @@ const bar = (st, w=48, h=3, color, center) => `${TBL(`margin:8px ${center?'auto'
 /* ---------------- 10 layouts ---------------- */
 const LAYOUTS = {
   classic:{label:'Classic split', fn:(d,st,s)=>{
-    const av = avatar(d,st);
+    const av = avatar(d,st,{match:1});
     return TBL() + `<tr>` +
-      (av ? `<td valign="top" style="padding:0 16px 0 0;">${av}</td>` : '') +
-      `<td valign="top" style="${av?`border-left:2px solid ${st.accent};padding:0 0 0 16px;`:''}">${nameEl(d,st)}${titleEl(d,st)}${companyEl(d,st)}${contactsV(d,st)}${socials(s,st)}</td>` +
+      (av ? `<td valign="middle" style="padding:0 16px 0 0;">${av}</td>` : '') +
+      `<td valign="middle"${M(st)} style="${av?`border-left:2px solid ${st.accent};padding:0 0 0 16px;`:''}">${nameEl(d,st)}${titleEl(d,st)}${companyEl(d,st)}${contactsV(d,st)}${socials(s,st)}</td>` +
       `</tr></table>`;
   }},
   stacked:{label:'Stacked modern', fn:(d,st,s)=>{
@@ -557,9 +583,9 @@ const LAYOUTS = {
     return TBL() + `<tr><td style="${T(st)}">${parts.join(`<span style="color:${st.muted};padding:0 7px;">|</span>`)}${contactsH(d,st,{sep:'·',sepColor:st.muted,pt:5})}${socials(s,st)}</td></tr></table>`;
   }},
   card:{label:'Rounded card', fn:(d,st,s)=>{
-    const av = avatar(d,st);
+    const av = avatar(d,st,{match:1});
     return TBL('width:480px;max-width:100%;') + `<tr><td style="border:1px solid #e3e6ee;border-radius:14px;padding:16px 18px;background:#fbfbfe;">` +
-      TBL() + `<tr>${av?`<td valign="top" style="padding-right:14px;">${av}</td>`:''}<td valign="middle">${nameEl(d,st)}${titleEl(d,st)}${companyEl(d,st)}</td></tr></table>` +
+      TBL() + `<tr>${av?`<td valign="middle" style="padding-right:14px;">${av}</td>`:''}<td valign="middle"${M(st)}>${nameEl(d,st)}${titleEl(d,st)}${companyEl(d,st)}</td></tr></table>` +
       `<div style="border-top:1px solid #e9ebf2;margin-top:12px;font-size:0;line-height:0;">&nbsp;</div>${contactsH(d,st,{pt:4})}${socials(s,st)}</td></tr></table>`;
   }},
   centered:{label:'Centered', fn:(d,st,s)=>{
@@ -569,13 +595,13 @@ const LAYOUTS = {
       `${nameEl(d,st,1.5,null,'text-align:center;')}${titleEl(d,st,null,'text-align:center;')}${companyEl(d,st,null,'text-align:center;')}${bar(st,40,3,null,true)}${contactsH(d,st,{align:'center',pt:2})}${socials(s,st,{align:'center'})}</td></tr></table>`;
   }},
   sidebar:{label:'Side panel', fn:(d,st,s)=>{
-    const av = avatar(d,st,{size:Math.round(st.photoSize*0.85),invert:true});
+    const av = avatar(d,st,{size:Math.round(st.photoSize*0.85),invert:true,match:1});
     return TBL() + `<tr>` +
       `<td valign="middle" align="center" style="background:${st.accent};padding:16px 18px;border-radius:12px 0 0 12px;text-align:center;min-width:110px;">` +
         (av?`${TBL('margin:0 auto;')}<tr><td>${av}</td></tr></table>`:'') +
         (d.company?`<div style="${T(st)}color:#ffffff;font-weight:700;font-size:${st.size-1}px;padding-top:${av?8:0}px;">${esc(d.company)}</div>`:'') +
       `</td>` +
-      `<td valign="top" style="padding:12px 18px;border:1px solid #e6e8ef;border-left:0;border-radius:0 12px 12px 0;">${nameEl(d,st)}${titleEl(d,st)}${contactsV(d,st)}${socials(s,st)}</td>` +
+      `<td valign="middle"${M(st)} style="padding:12px 18px;border:1px solid #e6e8ef;border-left:0;border-radius:0 12px 12px 0;">${nameEl(d,st)}${titleEl(d,st)}${contactsV(d,st)}${socials(s,st)}</td>` +
       `</tr></table>`;
   }},
   bold:{label:'Bold headline', fn:(d,st,s)=>{
@@ -586,15 +612,15 @@ const LAYOUTS = {
       `${contactsV(d,st)}${socials(s,st)}</td></tr></table>`;
   }},
   corporate:{label:'Corporate', fn:(d,st,s)=>{
-    const av = avatar(d,st,{size:Math.round(st.photoSize*0.85)});
+    const av = avatar(d,st,{size:Math.round(st.photoSize*0.85),match:1});
     return TBL('width:500px;max-width:100%;') +
       (d.company?`<tr><td style="${T(st)}color:${st.accent};font-weight:700;font-size:${st.size-1}px;letter-spacing:2px;text-transform:uppercase;padding-bottom:8px;border-bottom:2px solid ${st.accent};">${esc(d.company)}</td></tr>`:'') +
-      `<tr><td style="padding-top:12px;">${TBL()}<tr>${av?`<td valign="top" style="padding-right:14px;">${av}</td>`:''}<td valign="top">${nameEl(d,st,1.4)}${titleEl(d,st)}${contactsV(d,st)}</td></tr></table>${socials(s,st)}</td></tr></table>`;
+      `<tr><td style="padding-top:12px;">${TBL()}<tr>${av?`<td valign="middle" style="padding-right:14px;">${av}</td>`:''}<td valign="middle"${M(st)}>${nameEl(d,st,1.4)}${titleEl(d,st)}${contactsV(d,st)}</td></tr></table>${socials(s,st)}</td></tr></table>`;
   }},
   creative:{label:'Creative accent', fn:(d,st,s)=>{
-    const av = avatar(d,st);
+    const av = avatar(d,st,{match:1});
     return TBL() + `<tr>${av?`<td valign="middle" style="padding-right:14px;">${av}</td>`:''}` +
-      `<td valign="middle" style="border-left:5px solid ${st.accent};padding:4px 0 4px 14px;">${nameEl(d,st,1.6,st.accent)}${titleEl(d,st,null,'font-style:italic;')}${companyEl(d,st,st.nameColor)}${contactsH(d,st,{sep:'•'})}${socials(s,st)}</td></tr></table>`;
+      `<td valign="middle"${M(st)} style="border-left:5px solid ${st.accent};padding:4px 0 4px 14px;">${nameEl(d,st,1.6,st.accent)}${titleEl(d,st,null,'font-style:italic;')}${companyEl(d,st,st.nameColor)}${contactsH(d,st,{sep:'•'})}${socials(s,st)}</td></tr></table>`;
   }}
 };
 
@@ -614,7 +640,7 @@ function build(S){
 }
 
 /* ---------------- 20 samples (fictional people) ---------------- */
-const BASE_ST = {accent:'#7c5cff',nameColor:'#1f2433',text:'#3b4256',muted:'#7a8197',font:'Arial, Helvetica, sans-serif',size:13,photoShape:'circle',photoSize:78,showPhoto:true,contactStyle:'icons',showSocial:true,socialStyle:'brand',imgMode:'full',imgPos:'layout',imgWidth:160};
+const BASE_ST = {accent:'#7c5cff',nameColor:'#1f2433',text:'#3b4256',muted:'#7a8197',font:'Arial, Helvetica, sans-serif',size:13,photoShape:'circle',photoSize:78,showPhoto:true,contactStyle:'icons',showSocial:true,socialStyle:'brand',imgMode:'full',imgPos:'layout',imgWidth:160,imgFit:'match'};
 const DISC = 'CONFIDENTIALITY NOTICE: This email and any attachments are intended solely for the addressee and may contain confidential information. If you received it in error, please notify the sender and delete it.';
 const S = (cat, layout, d, st={}, s={}, x={}) => ({cat, layout, d:Object.assign({name:'',title:'',dept:'',company:'',phone:'',mobile:'',email:'',website:'',address:'',photo:'',tagline:''},d), st:Object.assign({},BASE_ST,st), s, x:Object.assign({ctaText:'',ctaUrl:'',disclaimer:'',eco:false,topLine:false},x)});
 const SAMPLES = [
@@ -654,7 +680,32 @@ const save = () => { clearTimeout(saveT); saveT = setTimeout(()=>{ try{ localSto
 const sigEl = $('#sig'), codeEl = $('#code');
 let editing = false;
 
-const currentHtml = () => state.custom != null ? state.custom : build(state);
+const MATCH = new Set(['classic','card','sidebar','corporate','creative']);
+const meas = document.createElement('div');
+Object.assign(meas.style,{position:'absolute',left:'-10000px',top:'0',width:'900px',visibility:'hidden',fontFamily:'Arial, Helvetica, sans-serif',fontSize:'14px'});
+document.body.appendChild(meas);
+function textHeight(){
+  const st = state.st, d = state.d;
+  if(!(st.showPhoto && d.photo && st.imgMode!=='crop' && st.imgFit==='match' && st.imgPos!=='banner' && MATCH.has(state.layout))) return 0;
+  let H = 0;
+  for(let i=0;i<3;i++){
+    meas.innerHTML = build(Object.assign({}, state, {st:Object.assign({}, st, {_m:true, _textH:H, showPhoto: !!H})}));
+    const el = meas.querySelector('#ess-m');
+    let h = 0;
+    if(el && el.children.length){
+      // height of the text content itself (not the stretched table cell)
+      const kids = Array.from(el.children);
+      h = Math.round(Math.max(...kids.map(k=>k.getBoundingClientRect().bottom)) - kids[0].getBoundingClientRect().top);
+      if(state.layout==='sidebar') h = Math.max(40, h + 24 - 32 - (d.company ? 26 : 0));
+    }
+    if(!h || h === H) break;
+    H = h;
+  }
+  meas.innerHTML = '';
+  return H > 20 ? H : 0;
+}
+const builderHtml = () => build(Object.assign({}, state, {st:Object.assign({}, state.st, {_textH:textHeight()})}));
+const currentHtml = () => state.custom != null ? state.custom : builderHtml();
 
 function render(opts={}){
   const html = currentHtml();
@@ -664,7 +715,21 @@ function render(opts={}){
   $('#lock').classList.toggle('on', isCustom);
   $('#customBanner').classList.toggle('on', isCustom);
   $$('[data-show]').forEach(el => el.textContent = getP(state, el.dataset.show));
+  updateMeter(html);
   save();
+}
+const GMAIL_MAX = 10000;
+const hasEmbedded = html => /src=["']?data:/i.test(html);
+function updateMeter(html){
+  const embedded = hasEmbedded(html);
+  const n = html.length, pct = Math.min(100, n / GMAIL_MAX * 100);
+  const bad = embedded || n > GMAIL_MAX;
+  $('#gmeter').classList.toggle('bad', bad);
+  $('#gmBar').style.width = pct + '%';
+  $('#gmText').textContent = embedded ? 'Embedded image — too large' : `${n.toLocaleString()} / ${GMAIL_MAX.toLocaleString()} characters`;
+  $('#gmMsg').textContent = embedded
+    ? 'Your image is uploaded (embedded), which Gmail rejects. Paste a hosted image link instead, or use "Copy for Gmail" to copy without it.'
+    : n > GMAIL_MAX ? 'Too long for Gmail — shorten the disclaimer or remove some items.' : '✓ Fits in Gmail.';
 }
 
 function fillForm(){
@@ -696,6 +761,20 @@ $$('[data-k]').forEach(el=>{
   if(el.type==='color') el.addEventListener('input', handler);
 });
 
+/* read the real shape of a linked image so the height-match keeps its proportions */
+let arT;
+$('[data-k="d.photo"]').addEventListener('input', e=>{
+  clearTimeout(arT);
+  const url = e.target.value.trim();
+  if(!/^https?:/i.test(url)){ if(!url) { delete state.d.photoAR; } return; }
+  delete state.d.photoAR;
+  arT = setTimeout(()=>{
+    const im = new Image();
+    im.onload = ()=>{ if(state.d.photo===url && im.naturalHeight){ state.d.photoAR = im.naturalWidth/im.naturalHeight; render(); } };
+    im.src = url;
+  }, 400);
+});
+
 /* tabs */
 $$('.tab').forEach(t=>t.addEventListener('click',()=>{
   $$('.tab').forEach(x=>x.classList.toggle('on', x===t));
@@ -722,6 +801,7 @@ $('#fileIn').addEventListener('change', e=>{
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
         state.d.photo = /png/i.test(f.type) ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', .9);
       }
+      state.d.photoAR = img.width / img.height;
       state.st.showPhoto = true;
       state.st.imgMode = square ? state.st.imgMode : 'full';
       if(!square && img.width / img.height > 1.6 && state.st.imgWidth < 200) state.st.imgWidth = 220;
@@ -830,7 +910,31 @@ const GUIDES = {
       'Pick defaults for new messages and replies → <b>OK</b>'
     ]}, note:'Tip: Outlook may square off rounded corners — that is normal and the layout stays intact.'}
 };
+function openGmailIssue(html){
+  const embedded = hasEmbedded(html);
+  $('#mTitle').textContent = embedded ? 'Gmail needs an image link' : 'Too long for Gmail';
+  $('#mSub').textContent = embedded
+    ? 'Gmail shows "The signature is too long" when an image is embedded, because the image data alone is far over Gmail\u2019s 10,000-character limit. Nothing was copied yet. Pick one:'
+    : `This signature is ${html.length.toLocaleString()} characters; Gmail allows 10,000. Shorten the disclaimer or remove a few items.`;
+  $('#mTabs').style.display = 'none';
+  $('#mSteps').innerHTML = embedded ? [
+    'Best: upload the image/GIF to a public host (your website, or any image host) and copy its <b>direct link</b> (ends in .gif / .png / .jpg)',
+    'Paste that link in <b>Photo / logo image URL</b> here (replacing the upload), then click <b>Copy for Gmail</b> again',
+    'Or click <b>Copy without image</b> below, paste in Gmail, then add the image with the image button in Gmail\u2019s signature editor'
+  ].map(x=>`<li>${x}</li>`).join('') : '';
+  $('#mNote').textContent = 'Animated GIFs from a link keep playing in Gmail.';
+  $('#mAlt').style.display = embedded ? '' : 'none';
+  $('#modal').classList.add('on');
+}
+$('#mAlt').addEventListener('click', async ()=>{
+  const tmp = Object.assign({}, state, {d:Object.assign({}, state.d, {photo:''}), st:Object.assign({}, state.st, {showPhoto:false})});
+  const html = state.custom != null ? state.custom.replace(/<img[^>]+src=["']?data:[^>]*>/gi,'') : build(tmp);
+  const ok = await copyRich(`<div style="font-family:${state.st.font};">${html}</div>`, plainText(html));
+  $('#modal').classList.remove('on');
+  if(ok) setTimeout(()=>openGuide('gmail'), 150); else toast('Copy blocked by the browser');
+});
 function openGuide(kind){
+  $('#mAlt').style.display = 'none';
   const g = GUIDES[kind]; const names = Object.keys(g.tabs);
   $('#mTitle').textContent = g.title;
   $('#mSub').textContent = 'Your signature is on the clipboard. Now paste it:';
@@ -848,6 +952,9 @@ $('#modal').addEventListener('click', e=>{ if(e.target.id==='modal') $('#modal')
 $$('[data-copy]').forEach(b=>b.addEventListener('click', async ()=>{
   const kind = b.dataset.copy, html = currentHtml();
   let ok;
+  if(kind==='gmail' && (hasEmbedded(html) || html.length > GMAIL_MAX)){
+    openGmailIssue(html); return;
+  }
   if(kind==='gmail' || kind==='outlook'){
     const wrapped = `<div style="font-family:${state.st.font};">${html}</div>`;
     ok = await copyRich(wrapped, plainText(html));
