@@ -294,14 +294,26 @@ footer .heart{color:var(--pink)}
         <div class="field"><label>GitHub</label><input type="text" data-k="s.github" placeholder="github.com/username"></div>
         <div class="field"><label>YouTube</label><input type="text" data-k="s.youtube" placeholder="youtube.com/@channel"></div>
         <div class="field"><label>WhatsApp</label><input type="text" data-k="s.whatsapp" placeholder="wa.me/91XXXXXXXXXX"></div>
+        <div class="field"><label>TikTok</label><input type="text" data-k="s.tiktok" placeholder="tiktok.com/@username"></div>
+        <div class="field"><label>Vimeo</label><input type="text" data-k="s.vimeo" placeholder="vimeo.com/username"></div>
+        <div class="field"><label>Spotify</label><input type="text" data-k="s.spotify" placeholder="open.spotify.com/…"></div>
+        <div class="field"><label>Reddit</label><input type="text" data-k="s.reddit" placeholder="reddit.com/u/username"></div>
+        <div class="field"><label>Pinterest</label><input type="text" data-k="s.pinterest" placeholder="pinterest.com/username"></div>
+        <div class="field"><label>Bluesky</label><input type="text" data-k="s.bluesky" placeholder="bsky.app/profile/handle"></div>
+        <div class="field"><label>WordPress</label><input type="text" data-k="s.wordpress" placeholder="yourblog.wordpress.com"></div>
+        <div class="field"><label>RSS feed</label><input type="text" data-k="s.rss" placeholder="yoursite.com/feed"></div>
+        <div class="field"><label>Signal</label><input type="text" data-k="s.signal" placeholder="signal.me/#p/+91…"></div>
         <div class="field"><label>Social style</label>
           <select data-k="st.socialStyle">
+            <option value="icons">Real logo icons</option>
             <option value="brand">Brand-color badges</option>
             <option value="accent">Accent-color badges</option>
             <option value="outline">Soft outline badges</option>
             <option value="text">Text links</option>
           </select>
         </div>
+        <div class="field"><label>Icon size</label><div class="range"><input type="range" min="16" max="36" step="2" data-k="st.iconSize"><output data-show="st.iconSize"></output></div></div>
+        <p class="hint">Real icons are hosted PNGs from mail-signatures.com, so they show in Gmail and Outlook.</p>
       </div>
 
       <!-- Design -->
@@ -532,7 +544,9 @@ function contactsH(d, st, opt={}){
   if(addr) h += `<div style="${T(st)}font-size:${st.size-1}px;text-align:${al};padding-top:3px;">${cItem(addr,st,opt.color)}</div>`;
   return h;
 }
-const BRAND = {linkedin:['in','#0A66C2','LinkedIn'],twitter:['X','#111111','X'],instagram:['IG','#E1306C','Instagram'],facebook:['f','#1877F2','Facebook'],github:['GH','#24292F','GitHub'],youtube:['YT','#FF0000','YouTube'],whatsapp:['WA','#25D366','WhatsApp']};
+const ICON_BASE = 'https://www.mail-signatures.com/wp-content/uploads/2022/09/';
+const ICONS = {linkedin:'LinkedIn',facebook:'Facebook',instagram:'Instagram',twitter:'X',youtube:'YouTube',tiktok:'TikTok',vimeo:'Vimeo',spotify:'Spotify',reddit:'Reddit',pinterest:'Pinterest',github:'GitHub',bluesky:'Bluesky',wordpress:'WordPress',rss:'RSS',whatsapp:'WhatsApp',signal:'Signal'};
+const BRAND = {linkedin:['in','#0A66C2','LinkedIn'],twitter:['X','#111111','X'],instagram:['IG','#E1306C','Instagram'],facebook:['f','#1877F2','Facebook'],github:['GH','#24292F','GitHub'],youtube:['YT','#FF0000','YouTube'],whatsapp:['WA','#25D366','WhatsApp'],tiktok:['TT','#000000','TikTok'],vimeo:['V','#1AB7EA','Vimeo'],spotify:['SP','#1DB954','Spotify'],reddit:['R','#FF4500','Reddit'],pinterest:['P','#E60023','Pinterest'],bluesky:['BS','#1185FE','Bluesky'],wordpress:['WP','#21759B','WordPress'],rss:['RSS','#F99000','RSS'],signal:['SG','#3A76F0','Signal']};
 function socials(s, st, opt={}){
   if(!st.showSocial) return '';
   const keys = Object.keys(BRAND).filter(k=>s && s[k] && s[k].trim());
@@ -540,6 +554,11 @@ function socials(s, st, opt={}){
   const al = opt.align||'left';
   if(st.socialStyle==='text'){
     return `<div style="${T(st)}font-size:${st.size-1}px;padding-top:8px;text-align:${al};">` + keys.map(k=>`<a href="${esc(normUrl(s[k]))}" style="color:${opt.color||st.accent};text-decoration:none;font-weight:700;">${BRAND[k][2]}</a>`).join(`<span style="color:${st.muted};padding:0 6px;">·</span>`) + `</div>`;
+  }
+  if(st.socialStyle==='icons'){
+    const z = +st.iconSize || 24;
+    const cells = keys.map(k=>`<td style="padding:0 6px 0 0;"><a href="${esc(normUrl(s[k]))}" style="text-decoration:none;display:inline-block;"><img src="${ICON_BASE}${ICONS[k]}-48x48-1.png" width="${z}" height="${z}" alt="${BRAND[k][2]}" style="display:block;width:${z}px;height:${z}px;border:0;"></a></td>`).join('');
+    return TBL(`margin-top:10px;${al==='center'?'margin-left:auto;margin-right:auto;':''}`) + `<tr>${cells}</tr></table>`;
   }
   const cells = keys.map(k=>{
     const [lab,col] = BRAND[k];
@@ -640,7 +659,7 @@ function build(S){
 }
 
 /* ---------------- 20 samples (fictional people) ---------------- */
-const BASE_ST = {accent:'#7c5cff',nameColor:'#1f2433',text:'#3b4256',muted:'#7a8197',font:'Arial, Helvetica, sans-serif',size:13,photoShape:'circle',photoSize:78,showPhoto:true,contactStyle:'icons',showSocial:true,socialStyle:'brand',imgMode:'full',imgPos:'layout',imgWidth:160,imgFit:'match'};
+const BASE_ST = {accent:'#7c5cff',nameColor:'#1f2433',text:'#3b4256',muted:'#7a8197',font:'Arial, Helvetica, sans-serif',size:13,photoShape:'circle',photoSize:78,showPhoto:true,contactStyle:'icons',showSocial:true,socialStyle:'icons',iconSize:24,imgMode:'full',imgPos:'layout',imgWidth:160,imgFit:'match'};
 const DISC = 'CONFIDENTIALITY NOTICE: This email and any attachments are intended solely for the addressee and may contain confidential information. If you received it in error, please notify the sender and delete it.';
 const S = (cat, layout, d, st={}, s={}, x={}) => ({cat, layout, d:Object.assign({name:'',title:'',dept:'',company:'',phone:'',mobile:'',email:'',website:'',address:'',photo:'',tagline:''},d), st:Object.assign({},BASE_ST,st), s, x:Object.assign({ctaText:'',ctaUrl:'',disclaimer:'',eco:false,topLine:false},x)});
 const SAMPLES = [
@@ -671,6 +690,7 @@ const KEY = 'ess-state-v1';
 let state;
 try{ const raw = localStorage.getItem(KEY); if(raw) state = JSON.parse(raw); }catch(e){}
 if(!state || !state.d){ state = clone(SAMPLES[0]); state.custom = null; }
+if(state.st && state.st.iconSize == null){ state.st.socialStyle = 'icons'; state.st.iconSize = 24; }
 state.st = Object.assign({}, BASE_ST, state.st);
 state.x = Object.assign({ctaText:'',ctaUrl:'',disclaimer:'',eco:false,topLine:false}, state.x);
 state.s = state.s || {};
